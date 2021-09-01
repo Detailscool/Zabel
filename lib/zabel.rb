@@ -109,9 +109,9 @@ module Zabel
     end
     if target.instance_of?(Xcodeproj::Project::Object::PBXNativeTarget)
       # see https://github.com/CocoaPods/Xcodeproj/blob/master/lib/xcodeproj/constants.rb#L145
-      if (target.product_type == 'com.apple.product-type.bundle') ||
-         (target.product_type == 'com.apple.product-type.library.static') ||
-         (target.product_type == 'com.apple.product-type.framework')
+      if (target.product_type == Xcodeproj::Constants::PRODUCT_TYPE_UTI[:bundle]) ||
+         (target.product_type == Xcodeproj::Constants::PRODUCT_TYPE_UTI[:static_library]) ||
+         (target.product_type == Xcodeproj::Constants::PRODUCT_TYPE_UTI[:framework])
         return true
       else
         puts "[XcodeCache] skip #{target.name} #{target.class} #{target.product_type}"
@@ -123,7 +123,6 @@ module Zabel
   end
 
   def self.zabel_get_dependency_files(target, intermediate_dir, product_dir, xcframeworks_build_dir)
-    puts "[XcodeCache] Getting dependency: #{target.name}"
     dependency_files = []
     Dir.glob("#{intermediate_dir}/**/*.d").each do |dependency_file|
       content = File.read(dependency_file)
@@ -411,7 +410,7 @@ module Zabel
     zip_start_time = Time.now
 
     command = "cd \"#{File.dirname(product_dir)}\" && tar -L -c -f #{target.name}.#{FILE_NAME_PRODUCT} #{File.basename(product_dir)}/#{full_product_name}"
-    if target.product_type == 'com.apple.product-type.library.static'
+    if target.product_type == Xcodeproj::Constants::PRODUCT_TYPE_UTI[:static_library]
       command = "cd \"#{File.dirname(product_dir)}\" && tar --exclude=*.bundle --exclude=*.framework -L -c -f #{target.name}.#{FILE_NAME_PRODUCT} #{File.basename(product_dir)}"
     end
 
@@ -525,9 +524,12 @@ module Zabel
           intermediate_dir = target_context[BUILD_KEY_TARGET_TEMP_DIR]
           xcframeworks_build_dir = target_context[BUILD_KEY_PODS_XCFRAMEWORKS_BUILD_DIR]
 
+          puts "[XcodeCache] Getting dependency: #{target.name} start"
+          dependency_time = Time.now
           dependency_files = zabel_get_dependency_files(target, intermediate_dir, product_dir,
                                                         xcframeworks_build_dir)
-          if source_files.size.positive? && dependency_files.size.zero? && (target.product_type != 'com.apple.product-type.bundle')
+          puts "[XcodeCache] Getting dependency: #{target.name} end -- time: #{(Time.now - dependency_time).to_i}"
+          if source_files.size.positive? && dependency_files.size.zero? && (target.product_type != Xcodeproj::Constants::PRODUCT_TYPE_UTI[:bundle])
             puts "[XcodeCache/E] #{target.name} should have dependent files"
             next
           end
@@ -577,8 +579,8 @@ module Zabel
         post_targets_context.each do |other_target, other_target_context|
           next if other_target == target
 
-          next if target.product_type == 'com.apple.product-type.bundle'
-          next if other_target.product_type == 'com.apple.product-type.bundle'
+          next if target.product_type == Xcodeproj::Constants::PRODUCT_TYPE_UTI[:bundle]
+          next if other_target.product_type == Xcodeproj::Constants::PRODUCT_TYPE_UTI[:bundle]
 
           target_context[:dependency_files].each do |dependency|
             if other_target_context[BUILD_KEY_CONFIGURATION_BUILD_DIR]&.size&.positive? &&
@@ -722,7 +724,7 @@ module Zabel
     end
     extract_script = "#{zabel_exec} #{STAGE_EXTRACT} \"#{target_cache_dir}\" \"#{target_context[:build_product_dir]}\" \"#{target_context[:build_intermediate_dir]}\""
 
-    inject_phase = target.new_shell_script_build_phase("zabel_extract_#{target.name}")
+    inject_phase = target.new_shell_script_build_phase("xcodecache_extract_#{target.name}")
     inject_phase.shell_script = extract_script
     inject_phase.show_env_vars_in_log = '1'
   end
@@ -732,7 +734,7 @@ module Zabel
     if ENV['BUNDLE_BIN_PATH']&.size&.positive? && ENV['BUNDLE_GEMFILE'] && ENV['BUNDLE_GEMFILE'].size.positive?
       zabel_exec = "source ~/.bash_profile\ncd \"#{File.dirname(ENV['BUNDLE_GEMFILE'])}\" && \"#{ENV['BUNDLE_BIN_PATH']}\" exe zabel"
     end
-    inject_phase = target.new_shell_script_build_phase("zabel_printenv_#{target.name}")
+    inject_phase = target.new_shell_script_build_phase("xcodecache_printenv_#{target.name}")
     inject_phase.shell_script = "#{zabel_exec} #{STAGE_PRINTENV} #{target.name} \"#{project.path}\""
     inject_phase.show_env_vars_in_log = '1'
   end
