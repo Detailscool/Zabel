@@ -826,18 +826,18 @@ module Zabel
 
             hit_target_context = YAML.load(File.read("#{target_cache_dir}/#{FILE_NAME_CONTEXT}"))
             hit_target_cache_dir = target_cache_dir
-            hit_target_context[:dependency_targets_md5].each do |item|
-              dependency_target = item[0]
-              dependency_target_md5 = item[1]
-
-              # cycle dependency targets will be miss every time.
-              # TODO: to detect cycle dependency so that cache will not be added,
-              # or to hit cache together with some kind of algorithms.
-              unless hit_target_md5_cache_set.include? "#{dependency_target}-#{dependency_target_md5}"
-                hit_target_cache_dir = nil
-                break
-              end
-            end
+            # hit_target_context[:dependency_targets_md5].each do |item|
+            #   dependency_target = item[0]
+            #   dependency_target_md5 = item[1]
+            #
+            #   # cycle dependency targets will be miss every time.
+            #   # TODO: to detect cycle dependency so that cache will not be added,
+            #   # or to hit cache together with some kind of algorithms.
+            #   unless hit_target_md5_cache_set.include? "#{dependency_target}-#{dependency_target_md5}"
+            #     hit_target_cache_dir = nil
+            #     break
+            #   end
+            # end
             if hit_target_cache_dir
               target_context.merge!(hit_target_context)
               break
