@@ -3,40 +3,40 @@
 require 'zabel'
 
 if ARGV[0] == Zabel::STAGE_CLEAN
-    Zabel::zabel_clean
+  Zabel::zabel_clean
 elsif ARGV[0] == Zabel::STAGE_EXTRACT
-    Zabel::zabel_extract
+  Zabel::zabel_extract
 elsif ARGV[0] == Zabel::STAGE_PRINTENV
-    Zabel::zabel_printenv
+  Zabel::zabel_printenv
 elsif ARGV[0] == Zabel::STAGE_PRE
-    Zabel::zabel_pre(ARGV[1..-1])
+  Zabel::zabel_pre(ARGV[1..])
 elsif ARGV[0] == Zabel::STAGE_POST
-    Zabel::zabel_post(ARGV[1..-1])
-elsif ARGV.include?("-configuration") or ARGV.include?("--configuration")
-    total_start_time = Time.now
+  Zabel::zabel_post(ARGV[1..])
+elsif ARGV.include?('-configuration') || ARGV.include?('--configuration')
+  total_start_time = Time.now
 
-    puts ARGV.to_s
-    
-    Zabel::zabel_pre(ARGV)
+  puts ARGV.to_s
 
-    build_start_time = Time.now
-    exit 1 unless system(*ARGV)
-    puts "[XcodeCache] duration = #{(Time.now - build_start_time).to_i} s in stage build"
+  Zabel::zabel_pre(ARGV)
 
-    Zabel::zabel_post(ARGV)
+  build_start_time = Time.now
+  exit 1 unless system(*ARGV)
+  puts "[XcodeCache] duration = #{(Time.now - build_start_time).to_i} s in stage build"
 
-    puts "[XcodeCache] duration = #{(Time.now - total_start_time).to_i} s in stage all"
-elsif ARGV.size == 0 or (ARGV.size == 1 and ARGV[0].include?("v"))
-    puts "ver: #{Zabel::VERSION}"
-    puts "exe: #{$0}"
-    puts "url: https://github.com/WeijunDeng/Zabel"
+  Zabel::zabel_post(ARGV)
+
+  puts "[XcodeCache] duration = #{(Time.now - total_start_time).to_i} s in stage all"
+elsif ARGV.size.zero? || ((ARGV.size == 1) && ARGV[0].include?('v'))
+  puts "ver: #{Zabel::VERSION}"
+  puts "exe: #{$0}"
+  puts 'url: https://github.com/WeijunDeng/Zabel'
 else
-    puts "Usage: "
-    puts "IMPORTANT: configuration must be set."
-    puts "For example:"
-    puts "zabel xcodebuild archive -workspace app.xcworkspace -scheme app -configuration Debug ..."
-    puts "zabel fastlane gym --workspace app.xcworkspace --scheme app --configuration Debug ..."
-    puts ""
-    puts "Advanced usage:"
-    puts "zabel pre -configuration Debug && xcodebuild/fastlane ... && zabel post -configuration Debug"
+  puts 'Usage: '
+  puts 'IMPORTANT: configuration must be set.'
+  puts 'For example:'
+  puts 'zabel xcodebuild archive -workspace app.xcworkspace -scheme app -configuration Debug ...'
+  puts 'zabel fastlane gym --workspace app.xcworkspace --scheme app --configuration Debug ...'
+  puts ''
+  puts 'Advanced usage:'
+  puts 'zabel pre -configuration Debug && xcodebuild/fastlane ... && zabel post -configuration Debug'
 end

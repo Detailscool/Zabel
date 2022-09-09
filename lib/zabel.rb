@@ -122,37 +122,37 @@ module Zabel
     false
   end
 
-  def self.zabel_get_dependency_files(target, intermediate_dir, product_dir, xcframeworks_build_dir)
-    dependency_files = []
-    Dir.glob("#{intermediate_dir}/**/*.d").each do |dependency_file|
-      content = File.read(dependency_file)
-      # see https://github.com/ccache/ccache/blob/master/src/Depfile.cpp#L141
-      # and this is a simple regex parser enough to get all files, as far as I know.
-      files = content.scan(/(?:\S(?:\\ )*)+/).flatten.uniq
-      files -= ['dependencies:', '\\', ':']
-
-      files.each do |file|
-        file = file.gsub('\\ ', ' ')
-
-        unless File.exist? file
-          unless File.exist? "#{$SRC_ROOT}/#{file}"
-            puts "[XcodeCache/E] #{target.name} #{file} should exist in dependency file #{dependency_file} in #{intermediate_dir}/**/*.d"
-            return []
-          end
-        end
-
-        if file.start_with?("#{intermediate_dir}/") ||
-           file.start_with?("#{product_dir}/")
-          next
-        end
-
-        next if xcframeworks_build_dir&.size&.positive? && file.start_with?("#{xcframeworks_build_dir}/")
-
-        dependency_files.push file
-      end
-    end
-    dependency_files.uniq
-  end
+  # def self.zabel_get_dependency_files(target, intermediate_dir, product_dir, xcframeworks_build_dir)
+  #   dependency_files = []
+  #   Dir.glob("#{intermediate_dir}/**/*.d").each do |dependency_file|
+  #     content = File.read(dependency_file)
+  #     # see https://github.com/ccache/ccache/blob/master/src/Depfile.cpp#L141
+  #     # and this is a simple regex parser enough to get all files, as far as I know.
+  #     files = content.scan(/(?:\S(?:\\ )*)+/).flatten.uniq
+  #     files -= ['dependencies:', '\\', ':']
+  #
+  #     files.each do |file|
+  #       file = file.gsub('\\ ', ' ')
+  #
+  #       unless File.exist? file
+  #         unless File.exist? "#{$SRC_ROOT}/#{file}"
+  #           puts "[XcodeCache/E] #{target.name} #{file} should exist in dependency file #{dependency_file} in #{intermediate_dir}/**/*.d"
+  #           return []
+  #         end
+  #       end
+  #
+  #       if file.start_with?("#{intermediate_dir}/") ||
+  #          file.start_with?("#{product_dir}/")
+  #         next
+  #       end
+  #
+  #       next if xcframeworks_build_dir&.size&.positive? && file.start_with?("#{xcframeworks_build_dir}/")
+  #
+  #       dependency_files.push file
+  #     end
+  #   end
+  #   dependency_files.uniq
+  # end
 
   def self.zabel_get_target_source_files(target)
     files = []
@@ -520,20 +520,20 @@ module Zabel
 
           source_files = zabel_get_target_source_files(target)
 
-          product_dir = target_context[BUILD_KEY_CONFIGURATION_BUILD_DIR]
-          intermediate_dir = target_context[BUILD_KEY_TARGET_TEMP_DIR]
-          xcframeworks_build_dir = target_context[BUILD_KEY_PODS_XCFRAMEWORKS_BUILD_DIR]
-
-          puts "[XcodeCache] Getting dependency: #{target.name} start"
-          dependency_time = Time.now
-          dependency_files = zabel_get_dependency_files(target, intermediate_dir, product_dir,
-                                                        xcframeworks_build_dir)
-          puts "[XcodeCache] Getting dependency: #{target.name} end -- time: #{(Time.now - dependency_time).to_i}"
-          if source_files.size.positive? && dependency_files.size.zero? && (target.product_type != Xcodeproj::Constants::PRODUCT_TYPE_UTI[:bundle])
-            puts "[XcodeCache/E] #{target.name} should have dependent files"
-            next
-          end
-          target_context[:dependency_files] = dependency_files - source_files
+          # product_dir = target_context[BUILD_KEY_CONFIGURATION_BUILD_DIR]
+          # intermediate_dir = target_context[BUILD_KEY_TARGET_TEMP_DIR]
+          # xcframeworks_build_dir = target_context[BUILD_KEY_PODS_XCFRAMEWORKS_BUILD_DIR]
+          #
+          # puts "[XcodeCache] Getting dependency: #{target.name} start"
+          # dependency_time = Time.now
+          # dependency_files = zabel_get_dependency_files(target, intermediate_dir, product_dir,
+          #                                               xcframeworks_build_dir)
+          # puts "[XcodeCache] Getting dependency: #{target.name} end -- time: #{(Time.now - dependency_time).to_i}"
+          # if source_files.size.positive? && dependency_files.size.zero? && (target.product_type != Xcodeproj::Constants::PRODUCT_TYPE_UTI[:bundle])
+          #   puts "[XcodeCache/E] #{target.name} should have dependent files"
+          #   next
+          # end
+          # target_context[:dependency_files] = dependency_files - source_files
           target_md5_content = zabel_get_target_md5_content(project, target, configuration_name, argv,
                                                             source_files)
           target_context[:target_md5_content] = target_md5_content
@@ -573,62 +573,62 @@ module Zabel
         target_context = post_targets_context[target]
         next unless target_context[:target_status] == STATUS_MISS_AND_READY
 
-        dependency_targets_set = Set.new
-        implicit_dependencies = []
-
-        post_targets_context.each do |other_target, other_target_context|
-          next if other_target == target
-
-          next if target.product_type == Xcodeproj::Constants::PRODUCT_TYPE_UTI[:bundle]
-          next if other_target.product_type == Xcodeproj::Constants::PRODUCT_TYPE_UTI[:bundle]
-
-          target_context[:dependency_files].each do |dependency|
-            if other_target_context[BUILD_KEY_CONFIGURATION_BUILD_DIR]&.size&.positive? &&
-               dependency.start_with?("#{other_target_context[BUILD_KEY_CONFIGURATION_BUILD_DIR]}/")
-              dependency_targets_set.add other_target
-              implicit_dependencies.push dependency
-            elsif other_target_context[BUILD_KEY_TARGET_TEMP_DIR]&.size&.positive? &&
-                  dependency.start_with?("#{other_target_context[BUILD_KEY_TARGET_TEMP_DIR]}/")
-              dependency_targets_set.add other_target
-              implicit_dependencies.push dependency
-            elsif other_target_context[:build_product_dir]&.size&.positive? &&
-                  dependency.start_with?("#{target_context[BUILD_KEY_SYMROOT]}/#{other_target_context[:build_product_dir]}/")
-              dependency_targets_set.add other_target
-              implicit_dependencies.push dependency
-            elsif other_target_context[:build_intermediate_dir]&.size&.positive? &&
-                  dependency.start_with?("#{target_context[BUILD_KEY_OBJROOT]}/#{other_target_context[:build_intermediate_dir]}/")
-              dependency_targets_set.add other_target
-              implicit_dependencies.push dependency
-            end
-
-            if !zabel_should_not_detect_module_map_dependency && (other_target_context[BUILD_KEY_MODULEMAP_FILE]&.size&.positive? &&
-                   (dependency == "#{Dir.pwd}/#{other_target_context[BUILD_KEY_MODULEMAP_FILE]}"))
-              dependency_targets_set.add other_target
-            end
-          end
-
-          target_context[:dependency_files] = target_context[:dependency_files] - implicit_dependencies
-        end
-
-        target_context[:dependency_files] = target_context[:dependency_files] - implicit_dependencies
-        dependency_files_md5 = []
-        should_not_cache = false
-        target_context[:dependency_files].each do |file|
-          if file.start_with?("#{target_context[BUILD_KEY_OBJROOT]}/") || file.start_with?("#{target_context[BUILD_KEY_SYMROOT]}/")
-            puts "[XcodeCache/W] #{target.name} #{file} dependecy should not include build path"
-            should_not_cache = true
-            break
-          end
-          dependency_files_md5.push [zabel_get_content_without_pwd(file), zabel_get_file_md5(file)]
-        end
-        next if should_not_cache
-
-        target_context[:dependency_files_md5] = dependency_files_md5.sort.uniq
-
-        dependency_targets_md5 = dependency_targets_set.to_a.map do |target|
-          [target.name, post_targets_context[target][:target_md5]]
-        end
-        target_context[:dependency_targets_md5] = dependency_targets_md5
+        # dependency_targets_set = Set.new
+        # implicit_dependencies = []
+        #
+        # post_targets_context.each do |other_target, other_target_context|
+        #   next if other_target == target
+        #
+        #   next if target.product_type == Xcodeproj::Constants::PRODUCT_TYPE_UTI[:bundle]
+        #   next if other_target.product_type == Xcodeproj::Constants::PRODUCT_TYPE_UTI[:bundle]
+        #
+          # target_context[:dependency_files].each do |dependency|
+          #   if other_target_context[BUILD_KEY_CONFIGURATION_BUILD_DIR]&.size&.positive? &&
+          #      dependency.start_with?("#{other_target_context[BUILD_KEY_CONFIGURATION_BUILD_DIR]}/")
+          #     dependency_targets_set.add other_target
+          #     implicit_dependencies.push dependency
+          #   elsif other_target_context[BUILD_KEY_TARGET_TEMP_DIR]&.size&.positive? &&
+          #         dependency.start_with?("#{other_target_context[BUILD_KEY_TARGET_TEMP_DIR]}/")
+          #     dependency_targets_set.add other_target
+          #     implicit_dependencies.push dependency
+          #   elsif other_target_context[:build_product_dir]&.size&.positive? &&
+          #         dependency.start_with?("#{target_context[BUILD_KEY_SYMROOT]}/#{other_target_context[:build_product_dir]}/")
+          #     dependency_targets_set.add other_target
+          #     implicit_dependencies.push dependency
+          #   elsif other_target_context[:build_intermediate_dir]&.size&.positive? &&
+          #         dependency.start_with?("#{target_context[BUILD_KEY_OBJROOT]}/#{other_target_context[:build_intermediate_dir]}/")
+          #     dependency_targets_set.add other_target
+          #     implicit_dependencies.push dependency
+          #   end
+          #
+          #   if !zabel_should_not_detect_module_map_dependency && (other_target_context[BUILD_KEY_MODULEMAP_FILE]&.size&.positive? &&
+          #          (dependency == "#{Dir.pwd}/#{other_target_context[BUILD_KEY_MODULEMAP_FILE]}"))
+          #     dependency_targets_set.add other_target
+          #   end
+          # end
+        #
+        #   target_context[:dependency_files] = target_context[:dependency_files] - implicit_dependencies
+        # end
+        #
+        # target_context[:dependency_files] = target_context[:dependency_files] - implicit_dependencies
+        # dependency_files_md5 = []
+        # should_not_cache = false
+        # target_context[:dependency_files].each do |file|
+        #   if file.start_with?("#{target_context[BUILD_KEY_OBJROOT]}/") || file.start_with?("#{target_context[BUILD_KEY_SYMROOT]}/")
+        #     puts "[XcodeCache/W] #{target.name} #{file} dependecy should not include build path"
+        #     should_not_cache = true
+        #     break
+        #   end
+        #   dependency_files_md5.push [zabel_get_content_without_pwd(file), zabel_get_file_md5(file)]
+        # end
+        # next if should_not_cache
+        #
+        # target_context[:dependency_files_md5] = dependency_files_md5.sort.uniq
+        #
+        # dependency_targets_md5 = dependency_targets_set.to_a.map do |target|
+        #   [target.name, post_targets_context[target][:target_md5]]
+        # end
+        # target_context[:dependency_targets_md5] = dependency_targets_md5
 
         message = target_context[:target_md5_content]
 
@@ -648,7 +648,7 @@ module Zabel
   end
 
   def self.zabel_get_potential_hit_target_cache_dirs(target, target_md5, miss_dependency_list)
-    dependency_start_time = Time.now
+    # dependency_start_time = Time.now
     target_cache_dirs = Dir.glob("#{zabel_get_cache_root}/#{target.name}-#{target_md5}-*")
     file_time_hash = {}
     target_cache_dirs.each do |file|
@@ -662,24 +662,24 @@ module Zabel
 
       target_context = YAML.load(File.read("#{target_cache_dir}/#{FILE_NAME_CONTEXT}"))
       dependency_miss = false
-      target_context[:dependency_files_md5].each do |item|
-        dependency_file = item[0]
-        dependency_md5 = item[1]
-
-        unless File.exist? dependency_file
-          unless File.exist? "#{$SRC_ROOT}/#{dependency_file}"
-            miss_dependency_list.push "[XcodeCache/W] #{target.name} #{dependency_file} file should exist to be hit"
-            dependency_miss = true
-            break
-          end
-        end
-        next if zabel_get_file_md5(dependency_file) == dependency_md5
-
-        miss_dependency_list.push "[XcodeCache/W] #{target.name} #{dependency_file} md5 #{zabel_get_file_md5(dependency_file)} should match #{dependency_md5} to be hit"
-        dependency_miss = true
-        break
-      end
-      next if dependency_miss
+      # target_context[:dependency_files_md5].each do |item|
+      #   dependency_file = item[0]
+      #   dependency_md5 = item[1]
+      #
+      #   unless File.exist? dependency_file
+      #     unless File.exist? "#{$SRC_ROOT}/#{dependency_file}"
+      #       miss_dependency_list.push "[XcodeCache/W] #{target.name} #{dependency_file} file should exist to be hit"
+      #       dependency_miss = true
+      #       break
+      #     end
+      #   end
+      #   next if zabel_get_file_md5(dependency_file) == dependency_md5
+      #
+      #   miss_dependency_list.push "[XcodeCache/W] #{target.name} #{dependency_file} md5 #{zabel_get_file_md5(dependency_file)} should match #{dependency_md5} to be hit"
+      #   dependency_miss = true
+      #   break
+      # end
+      # next if dependency_miss
 
       if target_context[:target_md5] != target_md5
         command = "rm -rf \"#{target_cache_dir}\""

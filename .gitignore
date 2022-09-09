@@ -17,3 +17,4 @@ logs
 *.lock
 *.log
 *.gem
+.idea
