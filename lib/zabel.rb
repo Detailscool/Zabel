@@ -282,7 +282,15 @@ module Zabel
     build_phases.push target.resources_build_phase if target.methods.include? :resources_build_phase
     build_phases.each do |_|
       target.source_build_phase.files_references.each do |files_reference|
-        if files_reference.instance_of?(Xcodeproj::Project::PBXFileReference)
+        if files_reference.instance_of?(Xcodeproj::Project::Object::PBXVariantGroup)
+          files_reference.files.each do |file_ref_in_group|
+            file_ref_in_group.build_files.each do |build_file|
+              if build_file.settings.instance_of?(Hash)
+                first_configuration.push "#{File.basename(build_file.file_ref.real_path.to_s)}\n#{build_file.settings.to_yaml}"
+              end
+            end
+          end
+        elsif files_reference.instance_of?(Xcodeproj::Project::PBXFileReference)
           files_reference.build_files.each do |build_file|
             if build_file.settings.instance_of?(Hash)
               first_configuration.push "#{File.basename(build_file.file_ref.real_path.to_s)}\n#{build_file.settings.to_yaml}"
