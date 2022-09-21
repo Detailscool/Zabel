@@ -707,7 +707,7 @@ module Zabel
       end
 
       potential_hit_target_cache_dirs.push target_cache_dir
-      break if target_context[:dependency_targets_md5].size.zero?
+      # break if target_context[:dependency_targets_md5].size.zero?
       break if potential_hit_target_cache_dirs.size > 10
     end
     potential_hit_target_cache_dirs
