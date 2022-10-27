@@ -259,7 +259,7 @@ module Zabel
       config_file_path = project_configuration.base_configuration_reference.real_path.to_s
       if File.exist? config_file_path
         project_xcconfig = File.read(config_file_path).lines.reject do |line|
-          line.include? '_SEARCH_PATHS'
+          line.include? '_PATHS'
         end.sort.join('')
       end
     end
@@ -271,7 +271,7 @@ module Zabel
       config_file_path = target_configuration.base_configuration_reference.real_path.to_s
       if File.exist? config_file_path
         target_xcconfig = File.read(config_file_path).lines.reject do |line|
-          line.include? '_SEARCH_PATHS'
+          line.include? '_PATHS'
         end.sort.join('')
       end
     end
